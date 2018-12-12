@@ -21,7 +21,7 @@ func init() {
 
 // TestGet is a sample to run an endpoint test
 func TestWeatherGet(t *testing.T) {
-	r, _ := http.NewRequest("GET", "//weather?city=Mexico&country=mx", nil)
+	r, _ := http.NewRequest("GET", "/weather?city=Mexico&country=mx", nil)
 	w := httptest.NewRecorder()
 	beego.BeeApp.Handlers.ServeHTTP(w, r)
 
