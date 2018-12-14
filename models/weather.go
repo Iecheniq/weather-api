@@ -1,10 +1,25 @@
 package models
 
 import (
+	"database/sql"
 	"fmt"
+	"log"
 	"strconv"
 	"time"
+
+	_ "github.com/go-sql-driver/mysql"
 )
+
+var db *sql.DB
+
+type WeatherDb interface {
+	Open()
+	Close()
+}
+
+type MySQLWeatherDb struct {
+	DataSource string
+}
 
 type WeatherJsonData struct {
 	Weather     []map[string]string    `json:"weather"`
@@ -26,6 +41,33 @@ type WeatherData struct {
 	Sunset        float64
 	Coordinates   map[string]float64
 	RequestedTime time.Time `json:"Requested_time"`
+}
+
+func SaveWeatherRequest() error {
+	res, err := db.Exec("INSERT INTO weather_requests () VALUES ()")
+	if err != nil {
+		return err
+	}
+	rowCnt, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	log.Printf("Affected = %d\n", rowCnt)
+	return nil
+}
+
+func (database *MySQLWeatherDb) Open() error {
+	db, _ = sql.Open("mysql", database.DataSource)
+
+	err := db.Ping()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (database *MySQLWeatherDb) Close() {
+	db.Close()
 }
 
 func (w *WeatherData) GetDataFromJSON(data WeatherJsonData) error {

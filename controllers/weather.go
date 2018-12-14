@@ -50,6 +50,11 @@ func (o *CityController) Get() {
 		http.Error(o.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	if err := models.SaveWeatherRequest(); err != nil {
+		log.Print(err)
+		http.Error(o.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	o.Data["json"] = weatherData
 	o.ServeJSON()
 }

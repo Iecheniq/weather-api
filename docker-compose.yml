@@ -1,13 +1,13 @@
 version: "2"
 
 services:
-  weather_requests:
+  weather_db:
     image: mysql:5.7
     volumes: 
       - ./mysql/data/dev:/var/lib/mysql
     environment:
       - MYSQL_ROOT_PASSWORD=root
-      - MYSQL_DATABASE=weather_requests
+      - MYSQL_DATABASE=weather_db
       - MYSQL_USER=root
       - MYSQL_PASSWORD=root
     networks: 
