@@ -17,11 +17,15 @@ type WeatherDb interface {
 	Close()
 }
 
+type WeatherJSONData interface {
+	ParseWeatherData() (*WeatherData, error)
+}
+
 type MySQLWeatherDb struct {
 	DataSource string
 }
 
-type WeatherJsonData struct {
+type OpenWeatherJsonData struct {
 	Weather     []map[string]string    `json:"weather"`
 	Main        map[string]float64     `json:"main"`
 	Wind        map[string]float64     `json:"wind"`
@@ -56,6 +60,18 @@ func SaveWeatherRequest() error {
 	return nil
 }
 
+func IsRequestTimestampGreater() (bool, error) {
+	timestamp := time.Time{}
+	err := db.QueryRow("SELECT * FROM weather_requests ORDER BY id DESC LIMIT 1").Scan(&timestamp)
+	if err != nil {
+		return false, err
+	}
+	if time.Now().Second()-timestamp.Second() > 300 {
+		return true, nil
+	}
+	return false, nil
+}
+
 func (database *MySQLWeatherDb) Open() error {
 	db, _ = sql.Open("mysql", database.DataSource)
 
@@ -70,23 +86,24 @@ func (database *MySQLWeatherDb) Close() {
 	db.Close()
 }
 
-func (w *WeatherData) GetDataFromJSON(data WeatherJsonData) error {
+func (op *OpenWeatherJsonData) ParseWeatherData() (wd *WeatherData, err error) {
 
-	country, ok := data.Sys["country"].(string)
+	wd = &WeatherData{}
+	country, ok := op.Sys["country"].(string)
 	if !ok {
-		err := fmt.Errorf("Country is not type string")
-		return err
+		err = fmt.Errorf("Country is not type string")
+		return nil, err
 	}
-	w.Location = data.City + ", " + country
-	w.Temperature = strconv.FormatFloat(data.Main["temp"], 'f', 0, 64) + "°C"
-	w.Wind = data.Wind
-	w.Cloudines = data.Weather[0]["description"]
-	w.Presure = strconv.FormatFloat(data.Main["pressure"], 'f', 0, 64) + " hpa"
-	w.Humidity = strconv.FormatFloat(data.Main["humidity"], 'f', 0, 64) + "%"
-	w.Sunrise = data.Sys["sunrise"].(float64)
-	w.Sunset = data.Sys["sunset"].(float64)
-	w.Coordinates = data.Coordinates
-	w.RequestedTime = time.Now()
+	wd.Location = op.City + ", " + country
+	wd.Temperature = strconv.FormatFloat(op.Main["temp"], 'f', 0, 64) + "°C"
+	wd.Wind = op.Wind
+	wd.Cloudines = op.Weather[0]["description"]
+	wd.Presure = strconv.FormatFloat(op.Main["pressure"], 'f', 0, 64) + " hpa"
+	wd.Humidity = strconv.FormatFloat(op.Main["humidity"], 'f', 0, 64) + "%"
+	wd.Sunrise = op.Sys["sunrise"].(float64)
+	wd.Sunset = op.Sys["sunset"].(float64)
+	wd.Coordinates = op.Coordinates
+	wd.RequestedTime = time.Now()
 
-	return nil
+	return wd, nil
 }

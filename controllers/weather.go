@@ -24,8 +24,7 @@ type CityController struct {
 // @Failure 403 :City weather not found
 // @router / [get]
 func (o *CityController) Get() {
-	weatherJData := models.WeatherJsonData{}
-	weatherData := models.WeatherData{}
+	weatherJData := models.OpenWeatherJsonData{}
 	city := o.GetString("city")
 	country := o.GetString("country")
 	if city == "" || country == "" {
@@ -45,16 +44,26 @@ func (o *CityController) Get() {
 		return
 	}
 	json.Unmarshal(body, &weatherJData)
-	if err := weatherData.GetDataFromJSON(weatherJData); err != nil {
+	weatherData, err := weatherJData.ParseWeatherData()
+	if err != nil {
 		log.Print(err)
 		http.Error(o.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if err := models.SaveWeatherRequest(); err != nil {
+	saveRequest, err := models.IsRequestTimestampGreater()
+	if err != nil {
 		log.Print(err)
 		http.Error(o.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	o.Data["json"] = weatherData
+	if saveRequest {
+		if err := models.SaveWeatherRequest(); err != nil {
+			log.Print(err)
+			http.Error(o.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	o.Data["json"] = *weatherData
 	o.ServeJSON()
 }
