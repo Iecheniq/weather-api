@@ -1,13 +1,14 @@
 package controllers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"io/ioutil"
 	"log"
 	"net/http"
 
 	"github.com/astaxie/beego"
-	"github.com/iecheniq/weather/external_services"
+	services "github.com/iecheniq/weather/external_services"
 	"github.com/iecheniq/weather/models"
 )
 
@@ -43,7 +44,11 @@ func (o *CityController) Get() {
 		http.Error(o.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.Unmarshal(body, &weatherJData)
+	if err := json.Unmarshal(body, &weatherJData); err != nil {
+		log.Print(err)
+		http.Error(o.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	weatherData, err := weatherJData.ParseWeatherData()
 	if err != nil {
 		log.Print(err)
@@ -52,10 +57,15 @@ func (o *CityController) Get() {
 	}
 	saveRequest, err := models.IsRequestTimestampGreater()
 	if err != nil {
+		if err == sql.ErrNoRows {
+			saveRequest = true
+			goto save_request
+		}
 		log.Print(err)
 		http.Error(o.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
 		return
 	}
+save_request:
 	if saveRequest {
 		if err := models.SaveWeatherRequest(); err != nil {
 			log.Print(err)

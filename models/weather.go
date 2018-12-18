@@ -2,7 +2,6 @@ package models
 
 import (
 	"database/sql"
-	"fmt"
 	"log"
 	"strconv"
 	"time"
@@ -26,12 +25,12 @@ type MySQLWeatherDb struct {
 }
 
 type OpenWeatherJsonData struct {
-	Weather     []map[string]string    `json:"weather"`
-	Main        map[string]float64     `json:"main"`
-	Wind        map[string]float64     `json:"wind"`
-	Sys         map[string]interface{} `json:"sys"`
-	City        string                 `json:"name"`
-	Coordinates map[string]float64     `json:"coord"`
+	Weather     []map[string]interface{} `json:"weather"`
+	Main        map[string]float64       `json:"main"`
+	Wind        map[string]float64       `json:"wind"`
+	Sys         map[string]interface{}   `json:"sys"`
+	City        string                   `json:"name"`
+	Coordinates map[string]float64       `json:"coord"`
 }
 
 type WeatherData struct {
@@ -41,8 +40,8 @@ type WeatherData struct {
 	Cloudines     string
 	Presure       string
 	Humidity      string
-	Sunrise       float64
-	Sunset        float64
+	Sunrise       time.Time
+	Sunset        time.Time
 	Coordinates   map[string]float64
 	RequestedTime time.Time `json:"Requested_time"`
 }
@@ -61,12 +60,17 @@ func SaveWeatherRequest() error {
 }
 
 func IsRequestTimestampGreater() (bool, error) {
-	timestamp := time.Time{}
-	err := db.QueryRow("SELECT * FROM weather_requests ORDER BY id DESC LIMIT 1").Scan(&timestamp)
+	const requestTimeLimit float64 = 300
+	requestTimestamp := ""
+	err := db.QueryRow("SELECT time FROM weather_requests ORDER BY id DESC LIMIT 1").Scan(&requestTimestamp)
 	if err != nil {
 		return false, err
 	}
-	if time.Now().Second()-timestamp.Second() > 300 {
+	requestTime, err := time.Parse("2006-01-02 15:04:05", requestTimestamp)
+	if err != nil {
+		return false, err
+	}
+	if time.Since(requestTime).Seconds() > requestTimeLimit {
 		return true, nil
 	}
 	return false, nil
@@ -89,19 +93,14 @@ func (database *MySQLWeatherDb) Close() {
 func (op *OpenWeatherJsonData) ParseWeatherData() (wd *WeatherData, err error) {
 
 	wd = &WeatherData{}
-	country, ok := op.Sys["country"].(string)
-	if !ok {
-		err = fmt.Errorf("Country is not type string")
-		return nil, err
-	}
-	wd.Location = op.City + ", " + country
+	wd.Location = op.City + ", " + op.Sys["country"].(string)
 	wd.Temperature = strconv.FormatFloat(op.Main["temp"], 'f', 0, 64) + "°C"
 	wd.Wind = op.Wind
-	wd.Cloudines = op.Weather[0]["description"]
+	wd.Cloudines = op.Weather[0]["description"].(string)
 	wd.Presure = strconv.FormatFloat(op.Main["pressure"], 'f', 0, 64) + " hpa"
 	wd.Humidity = strconv.FormatFloat(op.Main["humidity"], 'f', 0, 64) + "%"
-	wd.Sunrise = op.Sys["sunrise"].(float64)
-	wd.Sunset = op.Sys["sunset"].(float64)
+	wd.Sunrise = time.Unix(int64(op.Sys["sunrise"].(float64)), 0)
+	wd.Sunset = time.Unix(int64(op.Sys["sunset"].(float64)), 0)
 	wd.Coordinates = op.Coordinates
 	wd.RequestedTime = time.Now()
 
