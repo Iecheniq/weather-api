@@ -55,7 +55,7 @@ func (o *CityController) Get() {
 		http.Error(o.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	saveRequest, err := models.IsRequestTimestampGreater()
+	saveRequest, err := models.IsRequestTimestampGreater(city)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			saveRequest = true
@@ -67,7 +67,7 @@ func (o *CityController) Get() {
 	}
 save_request:
 	if saveRequest {
-		if err := models.SaveWeatherRequest(); err != nil {
+		if err := models.SaveWeatherRequest(city, country); err != nil {
 			log.Print(err)
 			http.Error(o.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
 			return

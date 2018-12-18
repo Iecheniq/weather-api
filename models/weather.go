@@ -46,8 +46,12 @@ type WeatherData struct {
 	RequestedTime time.Time `json:"Requested_time"`
 }
 
-func SaveWeatherRequest() error {
-	res, err := db.Exec("INSERT INTO weather_requests () VALUES ()")
+func SaveWeatherRequest(city, country string) error {
+	stmt, err := db.Prepare("INSERT INTO weather_requests (city, country) VALUES (?,?)")
+	if err != nil {
+		return err
+	}
+	res, err := stmt.Exec(city, country)
 	if err != nil {
 		return err
 	}
@@ -59,10 +63,10 @@ func SaveWeatherRequest() error {
 	return nil
 }
 
-func IsRequestTimestampGreater() (bool, error) {
+func IsRequestTimestampGreater(city string) (bool, error) {
 	const requestTimeLimit float64 = 300
 	requestTimestamp := ""
-	err := db.QueryRow("SELECT time FROM weather_requests ORDER BY id DESC LIMIT 1").Scan(&requestTimestamp)
+	err := db.QueryRow("SELECT time FROM weather_requests WHERE city = ? ORDER BY id DESC LIMIT 1", city).Scan(&requestTimestamp)
 	if err != nil {
 		return false, err
 	}
