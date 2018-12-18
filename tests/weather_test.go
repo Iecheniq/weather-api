@@ -2,12 +2,14 @@ package test
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"runtime"
 	"testing"
 
+	"github.com/iecheniq/weather/models"
 	_ "github.com/iecheniq/weather/routers"
 
 	"github.com/astaxie/beego"
@@ -22,6 +24,14 @@ func init() {
 
 // TestGet is a sample to run an endpoint test
 func TestWeatherGet(t *testing.T) {
+	db := models.MySQLWeatherDb{
+		DataSource: "root:root@tcp(localhost:3306)/weather_db_test",
+	}
+
+	if err := db.Open(); err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
 	testCases := []struct {
 		name string
 		url  string
