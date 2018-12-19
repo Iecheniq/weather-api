@@ -2,12 +2,18 @@ package controllers
 
 import (
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"log"
 	"net/http"
 
+	"weather/models"
+
 	"github.com/astaxie/beego"
+<<<<<<< HEAD
 	"github.com/iecheniq/weather/models"
+=======
+>>>>>>> v2
 )
 
 // Operations about weather
@@ -28,9 +34,19 @@ func (w *WeatherController) Get() {
 	country := w.GetString("country")
 	if city == "" || country == "" {
 		http.Error(w.Ctx.ResponseWriter, "You must enter params 'city' and 'country'", http.StatusBadRequest)
+<<<<<<< HEAD
 		return
 	}
 	response, err := models.GetWeather(city, country)
+=======
+		return
+	}
+	response, err := models.GetWeather(city, country)
+	if response.StatusCode == http.StatusNotFound {
+		http.Error(w.Ctx.ResponseWriter, errors.New("City not found").Error(), http.StatusNotFound)
+		return
+	}
+>>>>>>> v2
 	if err != nil {
 		http.Error(w.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
 		return
@@ -44,9 +60,19 @@ func (w *WeatherController) Get() {
 	if err := json.Unmarshal(body, &weatherJData); err != nil {
 		log.Print(err)
 		http.Error(w.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
+<<<<<<< HEAD
 		return
 	}
 	weatherData := weatherJData.ParseWeatherData()
+=======
+		return
+	}
+	weatherData, err := weatherJData.ParseWeatherData()
+	if err != nil {
+		http.Error(w.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
+		return
+	}
+>>>>>>> v2
 	if err := models.SaveWeatherRequest(weatherData); err != nil {
 		http.Error(w.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
 		return

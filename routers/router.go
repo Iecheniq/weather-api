@@ -8,7 +8,7 @@
 package routers
 
 import (
-	"github.com/iecheniq/weather/controllers"
+	"weather/controllers"
 
 	"github.com/astaxie/beego"
 )
@@ -16,8 +16,11 @@ import (
 func init() {
 	ns := beego.NewNamespace("/weather",
 		beego.NSInclude(&controllers.WeatherController{}),
+<<<<<<< HEAD
 		beego.NSNamespace("/scheduler",
 			beego.NSInclude(&controllers.SchedulerController{})),
+=======
+>>>>>>> v2
 	)
 	beego.AddNamespace(ns)
 }

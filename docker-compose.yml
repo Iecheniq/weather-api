@@ -1,6 +1,19 @@
 version: "2"
 
 services:
+  weather:
+    image: golang:1.11.2 
+    volumes:
+      - .:/go/src/weather
+    working_dir: /go/src/weather
+    command: go run main.go
+    links:
+      - weather_db
+    depends_on:
+      - weather_db
+    ports:
+      - 8080:8080
+
   weather_db:
     image: mysql:5.7
     volumes: 
