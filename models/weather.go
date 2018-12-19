@@ -1,14 +1,13 @@
 package models
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 	"time"
 
-	services "weather/external_services"
+	services "github.com/iecheniq/weather/external_services"
 
 	"github.com/astaxie/beego/orm"
 	_ "github.com/go-sql-driver/mysql"
@@ -86,29 +85,10 @@ func isRequestTimestampGreater(location string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if time.Since(wd.RequestedTime).Seconds() > requestTimeLimit {
+	if time.Since(wd.RequestedTime).Seconds() != requestTimeLimit { //TODO change "!=" to ">"
 		return true, nil
 	}
 	return false, nil
-}
-func SaveWeatherRequest(w *WeatherData) error {
-	saveRequest, err := isRequestTimestampGreater(w.Location)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			saveRequest = true
-			goto save_request
-		}
-		log.Print(err)
-		return err
-	}
-save_request:
-	if saveRequest {
-		if err := saveWeatherRequestDb(w); err != nil {
-			log.Print(err)
-			return err
-		}
-	}
-	return nil
 }
 
 func SaveWeatherRequest(w *WeatherData) error {
@@ -165,5 +145,5 @@ func (op *OpenWeatherJsonData) ParseWeatherData() (*WeatherData, error) {
 	wd.Coordinates = strconv.FormatFloat(op.Coordinates["lon"], 'f', 0, 64) + ", " + strconv.FormatFloat(op.Coordinates["lat"], 'f', 0, 64)
 	wd.RequestedTime = time.Now()
 
-	return nil, wd
+	return wd, nil
 }

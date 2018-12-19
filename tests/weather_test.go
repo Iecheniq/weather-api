@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"testing"
 
-	_ "weather/routers"
+	_ "github.com/iecheniq/weather/routers"
 
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/orm"
@@ -18,7 +18,7 @@ import (
 
 func init() {
 	orm.RegisterDriver("mysql", orm.DRMySQL)
-	orm.RegisterDataBase("default", "mysql", "root:root@tcp(weather_db:3306)/weather_db_test?charset=utf8")
+	orm.RegisterDataBase("default", "mysql", "root:root@tcp(localhost:3306)/weather_db_test?charset=utf8") //change localhost to weather
 	name := "default"
 	force := false
 	verbose := false
