@@ -35,6 +35,7 @@ func (w *WeatherController) Get() {
 	response, err := models.GetWeather(city, country)
 	if response.StatusCode == http.StatusNotFound {
 		http.Error(w.Ctx.ResponseWriter, errors.New("City not found").Error(), http.StatusNotFound)
+		return
 	}
 	if err != nil {
 		http.Error(w.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
