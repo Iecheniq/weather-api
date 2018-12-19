@@ -1,6 +1,8 @@
 package test
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -32,23 +34,30 @@ func init() {
 }
 
 // TestGet is a sample to run an endpoint test
-func TestWeatherGet(t *testing.T) {
-
+func TestSchedulerPut(t *testing.T) {
 	testCases := []struct {
 		name string
 		url  string
+		body map[string]string
 		code int
 	}{
-		{name: "Get weather with correct params", url: "/weather?city=Mexico&country=mx", code: 200},
-		{name: "Get weather with missing params", url: "/weather", code: 400},
-		{name: "Get weather with wrong params", url: "/weather?city=Mexo&country=mc", code: 404},
+		{name: "Add scheduler with correct params in body", url: "/weather/scheduler", body: map[string]string{"city": "Mexico", "country": "mx"}, code: 202},
+		{name: "Add Scheduler with missing params in body", url: "/weather/scheduler", body: map[string]string{"city": "Mexico"}, code: 400},
+		{name: "Add Scheduler with wrong params in body", url: "/weather/scheduler", body: map[string]string{"city": "Mico", "country": "ml"}, code: 404},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			r, _ := http.NewRequest("GET", tc.url, nil)
+			payload, err := json.Marshal(tc.body)
+			if err != nil {
+				log.Fatal(err)
+			}
+			r, err := http.NewRequest("PUT", tc.url, bytes.NewBuffer(payload))
+			if err != nil {
+				fmt.Print(err)
+			}
 			w := httptest.NewRecorder()
 			beego.BeeApp.Handlers.ServeHTTP(w, r)
-			beego.Trace("testing", "TestWeatherGet", "Code[%d]\n%s", w.Code, w.Body.String())
+			beego.Trace("testing", "TestSchedulerPut", "Code[%d]\n%s", w.Code, w.Body.String())
 
 			Convey("Subject: Test Station Endpoint\n", t, func() {
 				Convey(fmt.Sprintf("Status Code Should Be %v", tc.code), func() {
