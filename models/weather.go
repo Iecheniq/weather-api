@@ -2,11 +2,14 @@ package models
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
+	"net/http"
 	"strconv"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	services "github.com/iecheniq/weather/external_services"
 )
 
 var db *sql.DB
@@ -46,12 +49,22 @@ type WeatherData struct {
 	RequestedTime time.Time `json:"Requested_time"`
 }
 
-func SaveWeatherRequest(city, country string) error {
-	stmt, err := db.Prepare("INSERT INTO weather_requests (city, country) VALUES (?,?)")
+func GetWeather(city, country string) (*http.Response, error) {
+	//TODO Support different weather services
+	response, err := services.GetWeather(city, country)
+	if err != nil {
+		fmt.Print(err)
+		return nil, err
+	}
+	return response, nil
+}
+
+func saveWeatherRequestDb(w *WeatherData) error {
+	stmt, err := db.Prepare("INSERT INTO weather_requests (location, temperature, cloudines, presure, humidity) VALUES (?,?,?,?,?)")
 	if err != nil {
 		return err
 	}
-	res, err := stmt.Exec(city, country)
+	res, err := stmt.Exec(w.Location, w.Temperature, w.Cloudines, w.Presure, w.Humidity)
 	if err != nil {
 		return err
 	}
@@ -63,10 +76,10 @@ func SaveWeatherRequest(city, country string) error {
 	return nil
 }
 
-func IsRequestTimestampGreater(city string) (bool, error) {
-	const requestTimeLimit float64 = 300
+func isRequestTimestampGreater(location string) (bool, error) {
+	const requestTimeLimit float64 = 5
 	requestTimestamp := ""
-	err := db.QueryRow("SELECT time FROM weather_requests WHERE city = ? ORDER BY id DESC LIMIT 1", city).Scan(&requestTimestamp)
+	err := db.QueryRow("SELECT time FROM weather_requests WHERE location = ? ORDER BY id DESC LIMIT 1", location).Scan(&requestTimestamp)
 	if err != nil {
 		return false, err
 	}
@@ -78,6 +91,25 @@ func IsRequestTimestampGreater(city string) (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+func SaveWeatherRequest(w *WeatherData) error {
+	saveRequest, err := isRequestTimestampGreater(w.Location)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			saveRequest = true
+			goto save_request
+		}
+		log.Print(err)
+		return err
+	}
+save_request:
+	if saveRequest {
+		if err := saveWeatherRequestDb(w); err != nil {
+			log.Print(err)
+			return err
+		}
+	}
+	return nil
 }
 
 func (database *MySQLWeatherDb) Open() error {
@@ -94,7 +126,7 @@ func (database *MySQLWeatherDb) Close() {
 	db.Close()
 }
 
-func (op *OpenWeatherJsonData) ParseWeatherData() (wd *WeatherData, err error) {
+func (op *OpenWeatherJsonData) ParseWeatherData() (wd *WeatherData) {
 
 	wd = &WeatherData{}
 	wd.Location = op.City + ", " + op.Sys["country"].(string)
@@ -108,5 +140,5 @@ func (op *OpenWeatherJsonData) ParseWeatherData() (wd *WeatherData, err error) {
 	wd.Coordinates = op.Coordinates
 	wd.RequestedTime = time.Now()
 
-	return wd, nil
+	return wd
 }

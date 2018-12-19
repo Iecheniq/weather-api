@@ -1,19 +1,17 @@
 package controllers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"io/ioutil"
 	"log"
 	"net/http"
 
 	"github.com/astaxie/beego"
-	services "github.com/iecheniq/weather/external_services"
 	"github.com/iecheniq/weather/models"
 )
 
-// Operations about city
-type CityController struct {
+// Operations about weather
+type WeatherController struct {
 	beego.Controller
 }
 
@@ -24,56 +22,36 @@ type CityController struct {
 // @Success 200 {string} models.City.Name
 // @Failure 403 :City weather not found
 // @router / [get]
-func (o *CityController) Get() {
+func (w *WeatherController) Get() {
 	weatherJData := models.OpenWeatherJsonData{}
-	city := o.GetString("city")
-	country := o.GetString("country")
+	city := w.GetString("city")
+	country := w.GetString("country")
 	if city == "" || country == "" {
-		http.Error(o.Ctx.ResponseWriter, "You must enter params 'city' and 'country'", http.StatusBadRequest)
+		http.Error(w.Ctx.ResponseWriter, "You must enter params 'city' and 'country'", http.StatusBadRequest)
 		return
 	}
-	response, err := services.GetWeather(city, country)
+	response, err := models.GetWeather(city, country)
 	if err != nil {
-		log.Print(err)
-		http.Error(o.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
+		http.Error(w.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		log.Print(err)
-		http.Error(o.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
+		http.Error(w.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if err := json.Unmarshal(body, &weatherJData); err != nil {
 		log.Print(err)
-		http.Error(o.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
+		http.Error(w.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	weatherData, err := weatherJData.ParseWeatherData()
-	if err != nil {
-		log.Print(err)
-		http.Error(o.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
+	weatherData := weatherJData.ParseWeatherData()
+	if err := models.SaveWeatherRequest(weatherData); err != nil {
+		http.Error(w.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
 		return
-	}
-	saveRequest, err := models.IsRequestTimestampGreater(city)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			saveRequest = true
-			goto save_request
-		}
-		log.Print(err)
-		http.Error(o.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
-		return
-	}
-save_request:
-	if saveRequest {
-		if err := models.SaveWeatherRequest(city, country); err != nil {
-			log.Print(err)
-			http.Error(o.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
-			return
-		}
 	}
 
-	o.Data["json"] = *weatherData
-	o.ServeJSON()
+	w.Data["json"] = *weatherData
+	w.ServeJSON()
 }
