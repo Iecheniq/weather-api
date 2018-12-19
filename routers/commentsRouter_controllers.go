@@ -7,15 +7,6 @@ import (
 
 func init() {
 
-    beego.GlobalControllerRouter["github.com/iecheniq/weather/controllers:CityController"] = append(beego.GlobalControllerRouter["github.com/iecheniq/weather/controllers:CityController"],
-        beego.ControllerComments{
-            Method: "Get",
-            Router: `/`,
-            AllowHTTPMethods: []string{"get"},
-            MethodParams: param.Make(),
-            Filters: nil,
-            Params: nil})
-
     beego.GlobalControllerRouter["github.com/iecheniq/weather/controllers:ObjectController"] = append(beego.GlobalControllerRouter["github.com/iecheniq/weather/controllers:ObjectController"],
         beego.ControllerComments{
             Method: "Post",
@@ -119,6 +110,15 @@ func init() {
         beego.ControllerComments{
             Method: "Logout",
             Router: `/logout`,
+            AllowHTTPMethods: []string{"get"},
+            MethodParams: param.Make(),
+            Filters: nil,
+            Params: nil})
+
+    beego.GlobalControllerRouter["github.com/iecheniq/weather/controllers:WeatherController"] = append(beego.GlobalControllerRouter["github.com/iecheniq/weather/controllers:WeatherController"],
+        beego.ControllerComments{
+            Method: "Get",
+            Router: `/`,
             AllowHTTPMethods: []string{"get"},
             MethodParams: param.Make(),
             Filters: nil,
