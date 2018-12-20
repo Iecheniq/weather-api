@@ -1,0 +1,11 @@
+{
+    "location":"Mexico, mx", 
+    "temp":"25°C",
+    "wind": "7m/s, 60°", 
+    "cloudines": "clear sky", 
+    "pressure": "1026 hpa", 
+    "humidity": "15%", 
+    "sunrise":1545315298, 
+    "sunset":1545352453, 
+    "coord":"-112, 29 " 
+}

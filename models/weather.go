@@ -18,7 +18,7 @@ import (
 var service WeatherService
 
 type WeatherService interface {
-	GetData(city, country string) ([]byte, error)
+	GetData(city, country string) error
 	ParseData() (*WeatherData, error)
 }
 
@@ -38,15 +38,15 @@ type OpenWeatherService struct {
 
 type WeatherFromFilesService struct {
 	Route       string
-	Location    string
-	Temperature string
-	Wind        string
-	Cloudines   string
-	Presure     string
-	Humidity    string
-	Sunrise     int64
-	Sunset      int64
-	Coordinates string
+	Location    string `json:"location"`
+	Temperature string `json:"temp"`
+	Wind        string `json:"wind"`
+	Cloudines   string `json:"cloudines"`
+	Pressure    string `json:"pressure"`
+	Humidity    string `json:"humidity"`
+	Sunrise     int64  `json:"sunrise"`
+	Sunset      int64  `json:"sunset"`
+	Coordinates string `json:"coord"`
 }
 
 type WeatherData struct {
@@ -55,7 +55,7 @@ type WeatherData struct {
 	Temperature   string
 	Wind          string
 	Cloudines     string
-	Presure       string
+	Pressure      string
 	Humidity      string
 	Sunrise       time.Time
 	Sunset        time.Time
@@ -74,9 +74,9 @@ func setWeatherService() error {
 	selectedService := beego.AppConfig.String("WeatherService")
 	switch selectedService {
 	case "open_weather":
-		service = OpenWeatherService{URL: beego.AppConfig.String("OpenWeatherURL")}
+		service = &OpenWeatherService{URL: beego.AppConfig.String("OpenWeatherURL")}
 	case "from_files":
-		service = WeatherFromFilesService{}
+		service = &WeatherFromFilesService{}
 	default:
 		err := errors.New("Configuration variable WeatherService not set or not supported.\nValue options: open_weather, from_files")
 		fmt.Print(err)
@@ -86,12 +86,8 @@ func setWeatherService() error {
 }
 
 func GetWeather(city, country string) (*WeatherData, error) {
-	data, err := service.GetData(city, country)
+	err := service.GetData(city, country)
 	if err != nil {
-		return nil, err
-	}
-	if err := json.Unmarshal(data, &service); err != nil {
-		log.Print(err)
 		return nil, err
 	}
 	wd, err := service.ParseData()
@@ -102,25 +98,24 @@ func GetWeather(city, country string) (*WeatherData, error) {
 		return nil, err
 	}
 	return wd, nil
-
 }
 
 func AddScheduler(city, country string) error {
-	var err error
-	done := make(chan bool)
+
+	done := make(chan error)
 	go func() {
+		var err error
 		for {
-			_, err := GetWeather(city, country)
+			_, err = GetWeather(city, country)
 			if err != nil {
 				break
 			}
-			done <- true
-			time.Sleep(60 * time.Second)
+			done <- err
+			time.Sleep(3600 * time.Second)
 		}
-		done <- true
+		done <- err
 	}()
-	<-done
-	return err
+	return <-done
 }
 
 func saveWeatherRequestDb(wd *WeatherData) error {
@@ -154,7 +149,7 @@ func isRequestTimestampGreater(location string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if time.Since(wd.RequestedTime).Seconds() != requestTimeLimit { //TODO change "!=" to ">"
+	if time.Since(wd.RequestedTime).Seconds() > requestTimeLimit {
 		return true, nil
 	}
 	return false, nil
@@ -184,30 +179,34 @@ func (e CityNotFoundError) Error() string {
 	return e.Description
 }
 
-func (ow OpenWeatherService) GetData(city, country string) ([]byte, error) {
+func (ow *OpenWeatherService) GetData(city, country string) error {
 	cityCode := city + "," + country
 	url := fmt.Sprintf(ow.URL, cityCode)
 	client := http.Client{}
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	response, err := client.Do(req)
 	if err != nil {
 		log.Print(err)
-		return nil, err
+		return err
 	}
 	if response.StatusCode == http.StatusNotFound {
 		err = CityNotFoundError{Description: "City not found"}
 		log.Print(err)
-		return nil, err
+		return err
 	}
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		log.Print(err)
-		return nil, err
+		return err
 	}
-	return body, nil
+	if err := json.Unmarshal(body, ow); err != nil {
+		log.Print(err)
+		return err
+	}
+	return nil
 }
 
 func (op OpenWeatherService) ParseData() (*WeatherData, error) {
@@ -237,7 +236,7 @@ func (op OpenWeatherService) ParseData() (*WeatherData, error) {
 	wd.Temperature = strconv.FormatFloat(op.Main["temp"]-273.15, 'f', 0, 64) + "°C"
 	wd.Wind = strconv.FormatFloat(op.Wind["speed"], 'f', 0, 64) + "m/s, " + strconv.FormatFloat(op.Wind["deg"], 'f', 0, 64) + "°"
 	wd.Cloudines = cloudines
-	wd.Presure = strconv.FormatFloat(op.Main["pressure"], 'f', 0, 64) + " hpa"
+	wd.Pressure = strconv.FormatFloat(op.Main["pressure"], 'f', 0, 64) + " hpa"
 	wd.Humidity = strconv.FormatFloat(op.Main["humidity"], 'f', 0, 64) + "%"
 	wd.Sunrise = time.Unix(int64(sunrise), 0)
 	wd.Sunset = time.Unix(int64(sunset), 0)
@@ -247,9 +246,30 @@ func (op OpenWeatherService) ParseData() (*WeatherData, error) {
 	return wd, nil
 }
 
-func (wf WeatherFromFilesService) GetData(city, country string) ([]byte, error) {
-	return nil, nil
+func (wf *WeatherFromFilesService) GetData(city, country string) error {
+	filename := "w_" + city + "_" + country + ".json"
+	data, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, wf); err != nil {
+		return err
+	}
+	return nil
 }
 func (wf WeatherFromFilesService) ParseData() (*WeatherData, error) {
-	return nil, nil
+
+	wd := &WeatherData{}
+	wd.Location = wf.Location
+	wd.Temperature = wf.Temperature
+	wd.Wind = wf.Wind
+	wd.Cloudines = wf.Cloudines
+	wd.Pressure = wf.Pressure
+	wd.Humidity = wf.Humidity
+	wd.Sunrise = time.Unix(wf.Sunrise, 0)
+	wd.Sunset = time.Unix(wf.Sunset, 0)
+	wd.Coordinates = wf.Coordinates
+	wd.RequestedTime = time.Now()
+
+	return wd, nil
 }

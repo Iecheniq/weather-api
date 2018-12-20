@@ -1,0 +1,13 @@
+{
+    "location":"Bogota, co",
+    "temp":"20°C",
+    "wind": "4m/s, 45°", 
+    "cloudines": "clear sky", 
+    "pressure": "1024 hpa", 
+    "humidity": "30%", 
+    "sunrise":1545303514, 
+    "sunset":1545346207, 
+    "coord":"-112, 29 " 
+}
+
+
