@@ -1,29 +1,52 @@
 package models
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"strconv"
 	"time"
 
-	services "github.com/iecheniq/weather/external_services"
-
+	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/orm"
 	_ "github.com/go-sql-driver/mysql"
 )
 
-type WeatherJSONData interface {
-	ParseWeatherData() (*WeatherData, error)
+var service WeatherService
+
+type WeatherService interface {
+	GetData(city, country string) ([]byte, error)
+	ParseData() (*WeatherData, error)
 }
 
-type OpenWeatherJsonData struct {
+type CityNotFoundError struct {
+	Description string
+}
+
+type OpenWeatherService struct {
+	URL         string
 	Weather     []map[string]interface{} `json:"weather"`
 	Main        map[string]float64       `json:"main"`
 	Wind        map[string]float64       `json:"wind"`
 	Sys         map[string]interface{}   `json:"sys"`
 	City        string                   `json:"name"`
 	Coordinates map[string]float64       `json:"coord"`
+}
+
+type WeatherFromFilesService struct {
+	Route       string
+	Location    string
+	Temperature string
+	Wind        string
+	Cloudines   string
+	Presure     string
+	Humidity    string
+	Sunrise     int64
+	Sunset      int64
+	Coordinates string
 }
 
 type WeatherData struct {
@@ -42,16 +65,62 @@ type WeatherData struct {
 
 func init() {
 	orm.RegisterModel(new(WeatherData))
+	if err := setWeatherService(); err != nil {
+		log.Fatal(err)
+	}
 }
 
-func GetWeather(city, country string) (*http.Response, error) {
-	//TODO Support different weather services
-	response, err := services.GetWeather(city, country)
-	if err != nil {
+func setWeatherService() error {
+	selectedService := beego.AppConfig.String("WeatherService")
+	switch selectedService {
+	case "open_weather":
+		service = OpenWeatherService{URL: beego.AppConfig.String("OpenWeatherURL")}
+	case "from_files":
+		service = WeatherFromFilesService{}
+	default:
+		err := errors.New("Configuration variable WeatherService not set or not supported.\nValue options: open_weather, from_files")
 		fmt.Print(err)
+		return err
+	}
+	return nil
+}
+
+func GetWeather(city, country string) (*WeatherData, error) {
+	data, err := service.GetData(city, country)
+	if err != nil {
 		return nil, err
 	}
-	return response, nil
+	if err := json.Unmarshal(data, &service); err != nil {
+		log.Print(err)
+		return nil, err
+	}
+	wd, err := service.ParseData()
+	if err != nil {
+		return nil, err
+	}
+	if err := SaveWeatherRequest(wd); err != nil {
+		return nil, err
+	}
+	return wd, nil
+
+}
+
+func AddScheduler(city, country string) error {
+	var err error
+	done := make(chan bool)
+	go func() {
+		for {
+			_, err := GetWeather(city, country)
+			if err != nil {
+				break
+			}
+			done <- true
+			time.Sleep(60 * time.Second)
+		}
+		done <- true
+	}()
+	<-done
+	return err
 }
 
 func saveWeatherRequestDb(wd *WeatherData) error {
@@ -111,7 +180,37 @@ save_request:
 	return nil
 }
 
-func (op *OpenWeatherJsonData) ParseWeatherData() (*WeatherData, error) {
+func (e CityNotFoundError) Error() string {
+	return e.Description
+}
+
+func (ow OpenWeatherService) GetData(city, country string) ([]byte, error) {
+	cityCode := city + "," + country
+	url := fmt.Sprintf(ow.URL, cityCode)
+	client := http.Client{}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	response, err := client.Do(req)
+	if err != nil {
+		log.Print(err)
+		return nil, err
+	}
+	if response.StatusCode == http.StatusNotFound {
+		err = CityNotFoundError{Description: "City not found"}
+		log.Print(err)
+		return nil, err
+	}
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		log.Print(err)
+		return nil, err
+	}
+	return body, nil
+}
+
+func (op OpenWeatherService) ParseData() (*WeatherData, error) {
 
 	wd := &WeatherData{}
 	country, ok := op.Sys["country"].(string)
@@ -146,4 +245,11 @@ func (op *OpenWeatherJsonData) ParseWeatherData() (*WeatherData, error) {
 	wd.RequestedTime = time.Now()
 
 	return wd, nil
+}
+
+func (wf WeatherFromFilesService) GetData(city, country string) ([]byte, error) {
+	return nil, nil
+}
+func (wf WeatherFromFilesService) ParseData() (*WeatherData, error) {
+	return nil, nil
 }

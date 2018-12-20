@@ -1,10 +1,6 @@
 package controllers
 
 import (
-	"encoding/json"
-	"errors"
-	"io/ioutil"
-	"log"
 	"net/http"
 
 	"github.com/iecheniq/weather/models"
@@ -25,43 +21,21 @@ type WeatherController struct {
 // @Failure 403 :City weather not found
 // @router / [get]
 func (w *WeatherController) Get() {
-	weatherJData := models.OpenWeatherJsonData{}
 	city := w.GetString("city")
 	country := w.GetString("country")
 	if city == "" || country == "" {
 		http.Error(w.Ctx.ResponseWriter, "You must enter params 'city' and 'country'", http.StatusBadRequest)
 		return
 	}
-	response, err := models.GetWeather(city, country)
-	if response.StatusCode == http.StatusNotFound {
-		http.Error(w.Ctx.ResponseWriter, errors.New("City not found").Error(), http.StatusNotFound)
-		return
-	}
+	weatherData, err := models.GetWeather(city, country)
 	if err != nil {
+		if _, ok := err.(models.CityNotFoundError); ok {
+			http.Error(w.Ctx.ResponseWriter, err.Error(), http.StatusNotFound)
+			return
+		}
 		http.Error(w.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		log.Print(err)
-		http.Error(w.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if err := json.Unmarshal(body, &weatherJData); err != nil {
-		log.Print(err)
-		http.Error(w.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	weatherData, err := weatherJData.ParseWeatherData()
-	if err != nil {
-		http.Error(w.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if err := models.SaveWeatherRequest(weatherData); err != nil {
-		http.Error(w.Ctx.ResponseWriter, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	w.Data["json"] = *weatherData
 	w.ServeJSON()
 }
