@@ -110,18 +110,25 @@ func GetWeather(city, country string) (*WeatherData, error) {
 func AddScheduler(city, country string) error {
 
 	done := make(chan error)
-	go func() {
+	closeChannel := false
+
+	go func(bool) {
 		var err error
 		for {
 			_, err = GetWeather(city, country)
 			if err != nil {
+				log.Print(err)
 				break
 			}
-			done <- err
+			if closeChannel {
+				closeChannel = false
+				close(done)
+			}
 			time.Sleep(3600 * time.Second)
 		}
 		done <- err
-	}()
+	}(closeChannel)
+	closeChannel = true
 	return <-done
 }
 
@@ -219,7 +226,8 @@ func (ow *OpenWeatherService) GetData(city, country string) error {
 }
 
 func (op OpenWeatherService) ParseData() (*WeatherData, error) {
-
+	op.mux.Lock()
+	defer op.mux.Unlock()
 	wd := &WeatherData{}
 	country, ok := op.Sys["country"].(string)
 	if !ok {
@@ -269,7 +277,8 @@ func (wf *WeatherFromFilesService) GetData(city, country string) error {
 	return nil
 }
 func (wf WeatherFromFilesService) ParseData() (*WeatherData, error) {
-
+	wf.mux.Lock()
+	defer wf.mux.Unlock()
 	wd := &WeatherData{}
 	wd.Location = wf.Location
 	wd.Temperature = wf.Temperature
