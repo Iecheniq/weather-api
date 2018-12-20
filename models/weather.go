@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/astaxie/beego"
@@ -34,6 +35,7 @@ type OpenWeatherService struct {
 	Sys         map[string]interface{}   `json:"sys"`
 	City        string                   `json:"name"`
 	Coordinates map[string]float64       `json:"coord"`
+	mux         sync.Mutex
 }
 
 type WeatherFromFilesService struct {
@@ -47,6 +49,7 @@ type WeatherFromFilesService struct {
 	Sunrise     int64  `json:"sunrise"`
 	Sunset      int64  `json:"sunset"`
 	Coordinates string `json:"coord"`
+	mux         sync.Mutex
 }
 
 type WeatherData struct {
@@ -86,7 +89,11 @@ func setWeatherService() error {
 }
 
 func GetWeather(city, country string) (*WeatherData, error) {
-	err := service.GetData(city, country)
+	workers := make(chan error, 5)
+	go func() {
+		workers <- service.GetData(city, country)
+	}()
+	err := <-workers
 	if err != nil {
 		return nil, err
 	}
@@ -180,6 +187,8 @@ func (e CityNotFoundError) Error() string {
 }
 
 func (ow *OpenWeatherService) GetData(city, country string) error {
+	ow.mux.Lock()
+	defer ow.mux.Unlock()
 	cityCode := city + "," + country
 	url := fmt.Sprintf(ow.URL, cityCode)
 	client := http.Client{}
@@ -247,6 +256,8 @@ func (op OpenWeatherService) ParseData() (*WeatherData, error) {
 }
 
 func (wf *WeatherFromFilesService) GetData(city, country string) error {
+	wf.mux.Lock()
+	defer wf.mux.Unlock()
 	filename := "w_" + city + "_" + country + ".json"
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
